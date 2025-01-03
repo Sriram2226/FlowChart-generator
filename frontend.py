@@ -1,55 +1,35 @@
 import streamlit as st
 import requests
 
-# Streamlit configuration
-st.set_page_config(page_title="Flowchart Generator", layout="centered")
+# Backend API URL
+API_URL = "http://127.0.0.1:8000/render-mermaid/"
 
-# Title and description
-st.title("AI-Powered Flowchart Generator")
-st.write("Enter a prompt, and the AI will generate a flowchart for you!")
+# Streamlit App
+st.title("Mermaid.js Diagram Renderer")
+st.write("Enter your Mermaid.js graph definition below:")
 
-# Input for user prompt
-user_prompt = st.text_area("Enter your prompt:", placeholder="e.g., Create a flowchart for a login system")
+# Input Text Area
+graph_definition = st.text_area(
+    "Mermaid.js Graph Definition",
+    "graph TD; A-->B; B-->C; C-->D;",
+    height=200,
+)
 
-# Submit button
-if st.button("Generate Flowchart"):
-    if not user_prompt.strip():
-        st.error("Please enter a valid prompt.")
-    else:
-        # Backend API call
+# Button to render graph
+if st.button("Render Graph"):
+    # Send graph definition to the FastAPI backend
+    with st.spinner("Rendering graph..."):
         try:
-            # Replace with your backend API URL
-            api_url = "http://localhost:8000/generate-flowchart"  # Update with actual backend URL
-            response = requests.post(api_url, json={"prompt": user_prompt})
-            
+            response = requests.post(
+                API_URL,
+                data={"graph_definition": graph_definition},
+            )
             if response.status_code == 200:
-                mermaid_markdown = response.json().get("mermaid_markdown")
-                
-                if mermaid_markdown:
-                    # Display Mermaid.js markdown
-                    st.subheader("Generated Flowchart")
-                    st.write("```mermaid")
-                    st.write(mermaid_markdown)
-                    st.write("```")
-                    
-                    # Render Mermaid.js using Streamlit Markdown
-                    st.markdown(f"""
-                        <div class="mermaid">
-                        {mermaid_markdown}
-                        </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.error("Failed to generate flowchart. Please try again.")
+                svg_content = response.json().get("svg", "")
+                # Display the rendered SVG
+                st.write("### Rendered Diagram")
+                st.components.v1.html(svg_content, height=500, scrolling=True)
             else:
-                st.error(f"Error: {response.status_code} - {response.text}")
+                st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
         except Exception as e:
-            st.error(f"An error occurred: {e}")
-
-# Add Mermaid.js support in Streamlit
-mermaid_js = """
-<script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true });
-</script>
-"""
-st.markdown(mermaid_js, unsafe_allow_html=True)
+            st.error(f"An error occurred: {str(e)}")
