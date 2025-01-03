@@ -3,39 +3,24 @@ from fastapi.responses import JSONResponse
 import subprocess
 import tempfile
 import os
+from transformers import pipeline
 
 app = FastAPI()
 
-@app.post("/render-mermaid/")
-async def render_mermaid(graph_definition: str = Form(...)):
+# Load the NLP model (e.g., Hugging Face pipeline)
+flowchart_generator = pipeline("text2text-generation", model="openai/gpt-3.5-turbo")  # Replace with your model
+
+@app.post("/generate-flowchart/")
+async def generate_flowchart(prompt: str = Form(...)):
     """
-    Accepts Mermaid.js graph definitions, processes them using the Mermaid CLI, and returns the rendered SVG.
+    Accepts a natural language prompt and generates a Mermaid.js graph definition.
     """
     try:
-        # Create a temporary file for the Mermaid graph definition
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mmd") as temp_file:
-            temp_file.write(graph_definition.encode())
-            temp_file_path = temp_file.name
+        # Generate graph definition from prompt
+        result = flowchart_generator(prompt, max_length=100)
+        graph_definition = result[0]['generated_text']
 
-        # Create another temporary file to store the SVG output
-        svg_file_path = temp_file_path.replace(".mmd", ".svg")
+        return JSONResponse(content={"graph_definition": graph_definition}, status_code=200)
 
-        # Use the Mermaid CLI to render the SVG
-        command = ["mmdc", "-i", temp_file_path, "-o", svg_file_path]
-        subprocess.run(command, check=True)
-
-        # Read the SVG content
-        with open(svg_file_path, "r") as svg_file:
-            svg_content = svg_file.read()
-
-        # Cleanup temporary files
-        os.remove(temp_file_path)
-        os.remove(svg_file_path)
-
-        # Return the SVG content
-        return JSONResponse(content={"svg": svg_content}, status_code=200)
-
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Error rendering graph: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
